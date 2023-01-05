@@ -1,2 +1,1 @@
-# optimism-dashboard
-Optimism Blockchain Mega Dashboard
+# Optimism Mega Dashboard
