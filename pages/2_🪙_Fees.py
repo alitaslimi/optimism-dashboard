@@ -22,7 +22,7 @@ with open('style.css')as f:
     st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html = True)
 
 # Data Sources
-# @st.cache(ttl=3600)
+@st.cache(ttl=3600)
 def get_data(query):
     if query == 'Transactions Overview':
         return pd.read_json('https://api.flipsidecrypto.com/api/v2/queries/df60d653-c930-4c8b-923b-d4dfee9f22a9/data/latest')
@@ -47,15 +47,19 @@ with tab_overview:
     with c1:
         st.metric(label='**Total Transaction Fees**', value=str(transactions_overview['Fees'].map('{:,.0f}'.format).values[0]), help='USD')
         st.metric(label='**Total Gas Used**', value=str(transactions_overview['Gas'].map('{:,.0f}'.format).values[0]), help='gas')
+        st.metric(label='**Maximum Gas Price**', value=str(transactions_overview['GasPriceMax'].map('{:,.0f}'.format).values[0]), help='gwei')
     with c2:
         st.metric(label='**Average Fee Amount**', value=str(transactions_overview['FeeAverage'].map('{:,.2f}'.format).values[0]), help='USD')
         st.metric(label='**Average Gas Amount**', value=str(transactions_overview['GasAverage'].map('{:,.0f}'.format).values[0]), help='gas')
+        st.metric(label='**Average Gas Price**', value=str(transactions_overview['GasPriceAverage'].map('{:,.4f}'.format).values[0]), help='gwei')
     with c3:
         st.metric(label='**Median Fee Amount**', value=str(transactions_overview['FeeMedian'].map('{:,.4f}'.format).values[0]), help='USD')
         st.metric(label='**Median Gas Amount**', value=str(transactions_overview['GasMedian'].map('{:,.0f}'.format).values[0]), help='gas')
+        st.metric(label='**Median Gas Price**', value=str(transactions_overview['GasPriceMedian'].map('{:,.4f}'.format).values[0]), help='gwei')
     with c4:
         st.metric(label='**Average Fees/Block**', value=str(transactions_overview['Fees/Block'].map('{:,.2f}'.format).values[0]), help='USD')
         st.metric(label='**Average Gas/Block**', value=str(transactions_overview['Gas/Block'].map('{:,.0f}'.format).values[0]), help='gas')
+        st.metric(label='**Minimum Gas Price**', value=str(transactions_overview['GasPriceMin'].map('{:,.2f}'.format).values[0]), help='gwei')
 
     st.subheader('Activity Over Time')
 
@@ -66,44 +70,52 @@ with tab_overview:
     elif st.session_state.fees_interval == 'Weekly':
         transactions_over_time = transactions_daily
         transactions_over_time = transactions_over_time.groupby([pd.Grouper(freq='W', key='Date')]).agg(
-            {'Fees': 'sum', 'FeeAverage': 'mean', 'FeeMedian': 'mean', 'Fees/Block': 'mean',
-                'Gas': 'sum', 'GasAverage': 'mean', 'GasMedian': 'mean', 'Gas/Block': 'mean'}).reset_index()
+            {'Fees': 'sum', 'FeeAverage': 'mean', 'FeeMedian': 'mean', 'Fees/Block': 'mean', 'Gas': 'sum', 'GasAverage': 'mean',
+                'GasMedian': 'mean', 'Gas/Block': 'mean', 'GasPriceAverage': 'mean', 'GasPriceMedian': 'mean'}).reset_index()
     elif st.session_state.fees_interval == 'Monthly':
         transactions_over_time = transactions_daily
         transactions_over_time = transactions_over_time.groupby([pd.Grouper(freq='M', key='Date')]).agg(
-            {'Fees': 'sum', 'FeeAverage': 'mean', 'FeeMedian': 'mean', 'Fees/Block': 'mean',
-                'Gas': 'sum', 'GasAverage': 'mean', 'GasMedian': 'mean', 'Gas/Block': 'mean'}).reset_index()
+            {'Fees': 'sum', 'FeeAverage': 'mean', 'FeeMedian': 'mean', 'Fees/Block': 'mean', 'Gas': 'sum', 'GasAverage': 'mean',
+                'GasMedian': 'mean', 'Gas/Block': 'mean', 'GasPriceAverage': 'mean', 'GasPriceMedian': 'mean'}).reset_index()
 
     fig = sp.make_subplots(specs=[[{'secondary_y': True}]])
     fig.add_trace(go.Line(x=transactions_over_time['Date'], y=transactions_over_time['Fees'].round(), name='Fees'), secondary_y=False)
     fig.add_trace(go.Line(x=transactions_over_time['Date'], y=transactions_over_time['Gas'].round(), name='Gas'), secondary_y=True)
-    fig.update_layout(title_text='Daily Transaction Fees and Gas Used')
+    fig.update_layout(title_text='Transaction Fees and Gas Used Over Time')
     fig.update_yaxes(title_text='Fees [USD]', secondary_y=False)
-    fig.update_yaxes(title_text='Gas [Tgas]', secondary_y=True)
+    fig.update_yaxes(title_text='Gas [gas]', secondary_y=True)
     st.plotly_chart(fig, use_container_width=True, theme=theme_plotly)
 
     fig = sp.make_subplots(specs=[[{'secondary_y': True}]])
     fig.add_trace(go.Line(x=transactions_over_time['Date'], y=transactions_over_time['FeeAverage'].round(4), name='Average Fee'), secondary_y=False)
     fig.add_trace(go.Line(x=transactions_over_time['Date'], y=transactions_over_time['FeeMedian'].round(4), name='Median Fee'), secondary_y=True)
-    fig.update_layout(title_text='Daily Average and Median Transaction Fees')
+    fig.update_layout(title_text='Average and Median Transaction Fees Over Time')
     fig.update_yaxes(title_text='Average Fee [USD]', secondary_y=False)
     fig.update_yaxes(title_text='Median Fee [USD]', secondary_y=True)
     st.plotly_chart(fig, use_container_width=True, theme=theme_plotly)
     
     fig = sp.make_subplots(specs=[[{'secondary_y': True}]])
-    fig.add_trace(go.Line(x=transactions_over_time['Date'], y=transactions_over_time['GasAverage'].round(2), name='Average Gas'), secondary_y=False)
-    fig.add_trace(go.Line(x=transactions_over_time['Date'], y=transactions_over_time['GasMedian'].round(2), name='Median Gas'), secondary_y=True)
-    fig.update_layout(title_text='Daily Average and Median Gas Used')
-    fig.update_yaxes(title_text='Average Gas [Tgas]', secondary_y=False)
-    fig.update_yaxes(title_text='Median Gas [Tgas]', secondary_y=True)
+    fig.add_trace(go.Line(x=transactions_over_time['Date'], y=transactions_over_time['GasAverage'].round(), name='Average Gas'), secondary_y=False)
+    fig.add_trace(go.Line(x=transactions_over_time['Date'], y=transactions_over_time['GasMedian'].round(), name='Median Gas'), secondary_y=True)
+    fig.update_layout(title_text='Average and Median Gas Used Over Time')
+    fig.update_yaxes(title_text='Average Gas [gas]', secondary_y=False)
+    fig.update_yaxes(title_text='Median Gas [gas]', secondary_y=True)
+    st.plotly_chart(fig, use_container_width=True, theme=theme_plotly)
+
+    fig = sp.make_subplots(specs=[[{'secondary_y': True}]])
+    fig.add_trace(go.Line(x=transactions_over_time['Date'], y=transactions_over_time['GasPriceAverage'], name='Average Gas Price'), secondary_y=False)
+    fig.add_trace(go.Line(x=transactions_over_time['Date'], y=transactions_over_time['GasPriceMedian'], name='Median Gas Price'), secondary_y=True)
+    fig.update_layout(title_text='Average and Median Gas Price Over Time')
+    fig.update_yaxes(title_text='Average Gas Price [gwei]', secondary_y=False)
+    fig.update_yaxes(title_text='Median Gas Price [gwei]', secondary_y=True)
     st.plotly_chart(fig, use_container_width=True, theme=theme_plotly)
 
     fig = sp.make_subplots(specs=[[{'secondary_y': True}]])
     fig.add_trace(go.Line(x=transactions_over_time['Date'], y=transactions_over_time['Fees/Block'].round(4), name='Fees/Block'), secondary_y=False)
     fig.add_trace(go.Line(x=transactions_over_time['Date'], y=transactions_over_time['Gas/Block'].round(2), name='Gas/Block'), secondary_y=True)
-    fig.update_layout(title_text='Daily Average Transaction Fees/Block and Gas Used/Block')
+    fig.update_layout(title_text='Average Transaction Fees/Block and Gas Used/Block Over Time')
     fig.update_yaxes(title_text='Fees/Block [USD]', secondary_y=False)
-    fig.update_yaxes(title_text='Gas/Block [Tgas]', secondary_y=True)
+    fig.update_yaxes(title_text='Gas/Block [gas]', secondary_y=True)
     st.plotly_chart(fig, use_container_width=True, theme=theme_plotly)
 
 with tab_heatmap:

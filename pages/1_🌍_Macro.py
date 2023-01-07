@@ -22,9 +22,11 @@ with open('style.css')as f:
     st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html = True)
 
 # Data Sources
-# @st.cache(ttl=3600)
+@st.cache(ttl=3600)
 def get_data(query):
-    if query == 'Prices Daily':
+    if query == 'Prices Overview':
+        return pd.read_json('https://api.flipsidecrypto.com/api/v2/queries/6d1382f2-62fe-493e-8fec-73fb4923fe82/data/latest')
+    elif query == 'Prices Daily':
         return pd.read_json('https://api.flipsidecrypto.com/api/v2/queries/7497aa52-9d5a-4f87-9181-3460b9454598/data/latest')
     elif query == 'Blocks Overview':
         return pd.read_json('https://api.flipsidecrypto.com/api/v2/queries/ae07b6ca-1ed1-4f33-9962-82248051615b/data/latest')
@@ -42,6 +44,7 @@ def get_data(query):
         return pd.read_json('https://api.flipsidecrypto.com/api/v2/queries/caa89120-cdd2-4c04-8385-3a848a4d7f6c/data/latest')
     return None
 
+prices_overview = get_data('Prices Overview')
 prices_daily = get_data('Prices Daily')
 blocks_overview = get_data('Blocks Overview')
 blocks_daily = get_data('Blocks Daily')
@@ -52,7 +55,7 @@ transactions_status_overview = get_data('Transactions Status Overview')
 transactions_status_daily = get_data('Transactions Status Daily')
 
 # Content
-tab_overview, tab_heatmap, tab_status = st.tabs(['**Overview**', '**Heatmap**', '**Success Rate**'])
+tab_overview, tab_heatmap, tab_status, tab_price = st.tabs(['**Overview**', '**Heatmap**', '**Success Rate**', '**OP Price**'])
 
 with tab_overview:
     
@@ -97,15 +100,7 @@ with tab_overview:
             {'Blocks': 'sum', 'Transactions': 'sum', 'Users': 'sum', 'TPS': 'mean'}).reset_index()
 
     fig = sp.make_subplots(specs=[[{'secondary_y': True}]])
-    fig.add_trace(go.Line(x=prices_daily['Date'], y=prices_daily['Price'], name='Price'), secondary_y=False)
-    fig.add_trace(go.Bar(x=prices_daily['Date'], y=prices_daily['Change'], name='Change'), secondary_y=True)
-    fig.update_layout(title_text='OP Price and Its Percentage Change Over Time')
-    fig.update_yaxes(title_text='Price [USD]', secondary_y=False)
-    fig.update_yaxes(title_text='Change [%]', secondary_y=True)
-    st.plotly_chart(fig, use_container_width=True, theme=theme_plotly)
-
-    fig = sp.make_subplots(specs=[[{'secondary_y': True}]])
-    fig.add_trace(go.Line(x=blocks_over_time['Date'], y=blocks_over_time['Blocks'], name='Blocks'), secondary_y=False)
+    fig.add_trace(go.Bar(x=blocks_over_time['Date'], y=blocks_over_time['Blocks'], name='Blocks'), secondary_y=False)
     fig.add_trace(go.Line(x=transactions_over_time['Date'], y=transactions_over_time['Transactions'], name='Transactions'), secondary_y=True)
     fig.update_layout(title_text='Number of Blocks and Transactions Over Time')
     fig.update_yaxes(title_text='Blocks', secondary_y=False)
@@ -121,7 +116,7 @@ with tab_overview:
     st.plotly_chart(fig, use_container_width=True, theme=theme_plotly)
 
     fig = px.area(transactions_over_time, x='Date', y='Users', title='Active Addresses Over Time')
-    fig.update_layout(legend_title=None, xaxis_title=None, yaxis_title=None)
+    fig.update_layout(legend_title=None, xaxis_title=None, yaxis_title='Addresses')
     st.plotly_chart(fig, use_container_width=True, theme=theme_plotly)
 
 with tab_heatmap:
@@ -176,4 +171,55 @@ with tab_status:
     fig = px.line(transactions_status_daily, x='Date', y='Fees', color='Status', custom_data=['Status'], title='Fees Over Time')
     fig.update_layout(legend_title=None, xaxis_title=None, yaxis_title='Fees [USD]', hovermode='x unified')
     fig.update_traces(hovertemplate='%{customdata}: %{y:,.2f}<extra></extra>')
+    st.plotly_chart(fig, use_container_width=True, theme=theme_plotly)
+
+with tab_price:
+
+    st.subheader('Overview')
+
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        st.metric(label='**Latest Price**', value=str(prices_overview['Price'].map('{:,.4f}'.format).values[0]), help='USD')
+    with c2:
+        st.metric(label='**7 Day Moving Average**', value=str(prices_overview['7D-MA'].map('{:,.4f}'.format).values[0]), help='USD')
+    with c3:
+        st.metric(label='**All Time High**', value=str(prices_overview['ATH'].map('{:,.4f}'.format).values[0]), help='USD')
+    with c4:
+        st.metric(label='**All Time Low**', value=str(prices_overview['ATL'].map('{:,.4f}'.format).values[0]), help='USD')
+
+    st.subheader('Activity Over Time')
+
+    interval = st.radio('**Time Interval**', ['Daily', 'Weekly', 'Monthly'], key='prices_interval', horizontal=True)
+
+    if st.session_state.prices_interval == 'Daily':
+        price_over_time = prices_daily
+    elif st.session_state.prices_interval == 'Weekly':
+        price_over_time = prices_daily
+        price_over_time = price_over_time.groupby([pd.Grouper(freq='W', key='Date')]).agg('mean').reset_index()
+    elif st.session_state.prices_interval == 'Monthly':
+        price_over_time = prices_daily
+        price_over_time = price_over_time.groupby([pd.Grouper(freq='M', key='Date')]).agg('mean').reset_index()
+
+    fig = sp.make_subplots(specs=[[{'secondary_y': True}]])
+    fig.add_trace(go.Bar(x=price_over_time['Date'], y=price_over_time['Change'], name='Change'), secondary_y=False)
+    fig.add_trace(go.Line(x=price_over_time['Date'], y=price_over_time['OP'], name='OP'), secondary_y=True)
+    fig.update_layout(title_text='OP Price and Its Percentage Change Over Time')
+    fig.update_yaxes(title_text='Change [%]', secondary_y=False)
+    fig.update_yaxes(title_text='Price [USD]', secondary_y=True)
+    st.plotly_chart(fig, use_container_width=True, theme=theme_plotly)
+
+    fig = sp.make_subplots(specs=[[{'secondary_y': True}]])
+    fig.add_trace(go.Line(x=price_over_time['Date'], y=price_over_time['OP'], name='OP'), secondary_y=False)
+    fig.add_trace(go.Line(x=price_over_time['Date'], y=price_over_time['ETH'], name='ETH'), secondary_y=True)
+    fig.update_layout(title_text='Price Correlation of OP with ETH Over Time')
+    fig.update_yaxes(title_text='OP [OP]', secondary_y=False)
+    fig.update_yaxes(title_text='ETH [USD]', secondary_y=True)
+    st.plotly_chart(fig, use_container_width=True, theme=theme_plotly)
+
+    fig = sp.make_subplots(specs=[[{'secondary_y': True}]])
+    fig.add_trace(go.Line(x=price_over_time['Date'], y=price_over_time['OP'], name='OP'), secondary_y=False)
+    fig.add_trace(go.Line(x=price_over_time['Date'], y=price_over_time['BTC'], name='BTC'), secondary_y=True)
+    fig.update_layout(title_text='Price Correlation of OP with BTC Over Time')
+    fig.update_yaxes(title_text='OP [OP]', secondary_y=False)
+    fig.update_yaxes(title_text='BTC [USD]', secondary_y=True)
     st.plotly_chart(fig, use_container_width=True, theme=theme_plotly)
