@@ -21,7 +21,7 @@ with open('style.css')as f:
     st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html = True)
 
 # Data Sources
-@st.cache(ttl=3600)
+@st.cache(ttl=1000, allow_output_mutation=True)
 def get_data(query):
     if query == 'Bridges Overview':
         return pd.read_json('https://api.flipsidecrypto.com/api/v2/queries/0eb7ce61-825c-4047-8845-6e56950f0c46/data/latest')
@@ -74,7 +74,7 @@ with tab_overview:
             {'Transactions': 'sum', 'Bridgers': 'sum', 'Volume': 'sum', 'AmountAverage': 'mean', 'AmountMedian': 'mean'}).reset_index()
     elif st.session_state.bridges_interval == 'Monthly':
         bridges_over_time = bridges_daily
-        bridges_over_time = bridges_over_time.groupby(pd.Grouper(freq='M', key='Date')).agg(
+        bridges_over_time = bridges_over_time.groupby(pd.Grouper(freq='MS', key='Date')).agg(
             {'Transactions': 'sum', 'Bridgers': 'sum', 'Volume': 'sum', 'AmountAverage': 'mean', 'AmountMedian': 'mean'}).reset_index()
 
     fig = px.area(bridges_over_time, x='Date', y='Volume', title='Bridged Volume Over Time')
@@ -135,7 +135,7 @@ with tab_protocols:
             {'Transactions': 'sum', 'Bridgers': 'sum', 'Volume': 'sum', 'AmountAverage': 'mean', 'AmountMedian': 'mean'}).reset_index()
     elif st.session_state.protocols_interval == 'Monthly':
         df = bridges_protocols_daily
-        df = df.groupby([pd.Grouper(freq='M', key='Date'), 'Protocol']).agg(
+        df = df.groupby([pd.Grouper(freq='MS', key='Date'), 'Protocol']).agg(
             {'Transactions': 'sum', 'Bridgers': 'sum', 'Volume': 'sum', 'AmountAverage': 'mean', 'AmountMedian': 'mean'}).reset_index()
         df['RowNumber'] = df.groupby('Date')['Volume'].rank(method='max', ascending=False)
         df.loc[df['RowNumber'] > 5, 'Protocol'] = 'Other'
@@ -236,7 +236,7 @@ with tab_tokens:
             {'Transactions': 'sum', 'Bridgers': 'sum', 'Volume': 'sum', 'AmountAverage': 'mean', 'AmountMedian': 'mean'}).reset_index()
     elif st.session_state.tokens_interval == 'Monthly':
         df = bridges_tokens_daily
-        df = df.groupby([pd.Grouper(freq='M', key='Date'), 'Token']).agg(
+        df = df.groupby([pd.Grouper(freq='MS', key='Date'), 'Token']).agg(
             {'Transactions': 'sum', 'Bridgers': 'sum', 'Volume': 'sum', 'AmountAverage': 'mean', 'AmountMedian': 'mean'}).reset_index()
         df['RowNumber'] = df.groupby('Date')['Volume'].rank(method='max', ascending=False)
         df.loc[df['RowNumber'] > 3, 'Token'] = 'Other'

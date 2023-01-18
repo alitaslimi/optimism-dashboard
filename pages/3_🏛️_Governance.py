@@ -21,7 +21,7 @@ with open('style.css')as f:
     st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html = True)
 
 # Data Sources
-@st.cache(ttl=3600)
+@st.cache(ttl=1000, allow_output_mutation=True)
 def get_data(query):
     if query == 'Airdrops Overview':
         return pd.read_json('https://api.flipsidecrypto.com/api/v2/queries/c9975ac7-ff80-4727-9871-50854a4d09c4/data/latest')
@@ -97,7 +97,7 @@ with tab_airdrop:
     elif st.session_state.airdrops_interval == 'Weekly':
         df = airdrops_daily.groupby([pd.Grouper(freq='W', key='Date')]).agg('sum').reset_index()
     elif st.session_state.airdrops_interval == 'Monthly':
-        df = airdrops_daily.groupby([pd.Grouper(freq='M', key='Date')]).agg('sum').reset_index()
+        df = airdrops_daily.groupby([pd.Grouper(freq='MS', key='Date')]).agg('sum').reset_index()
 
     fig = sp.make_subplots(specs=[[{'secondary_y': True}]])
     fig.add_trace(go.Line(x=df['Date'], y=df['Amount'], name='Amount'), secondary_y=False)
@@ -131,9 +131,9 @@ with tab_delegations:
     if st.session_state.delegations_interval == 'Daily':
         df = delegations_daily
     elif st.session_state.delegations_interval == 'Weekly':
-        df = delegations_daily.groupby([pd.Grouper(freq='W', key='Date')]).agg('sum').reset_index()
+        df = delegations_daily.groupby([pd.Grouper(freq='W', key='Date'), 'Type']).agg('sum').reset_index()
     elif st.session_state.delegations_interval == 'Monthly':
-        df = delegations_daily.groupby([pd.Grouper(freq='M', key='Date')]).agg('sum').reset_index()
+        df = delegations_daily.groupby([pd.Grouper(freq='MS', key='Date'), 'Type']).agg('sum').reset_index()
 
     fig = px.line(df, x='Date', y='Delegations', color='Type', custom_data=['Type'], title='Delegations Over Time', log_y=True)
     fig.update_layout(legend_title=None, xaxis_title=None, yaxis_title='Addresses', hovermode='x unified')

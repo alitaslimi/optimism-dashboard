@@ -22,7 +22,7 @@ with open('style.css')as f:
     st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html = True)
 
 # Data Sources
-@st.cache(ttl=3600)
+@st.cache(ttl=1000, allow_output_mutation=True)
 def get_data(query):
     if query == 'Transfers Overview':
         return pd.read_json('https://api.flipsidecrypto.com/api/v2/queries/2f3542c9-b8ad-4afe-bc26-0b44af367a68/data/latest')
@@ -116,7 +116,7 @@ with tab_overview:
                 'AmountMedian': 'mean', 'Transfers/User': 'mean', 'Volume/User': 'mean'}).reset_index()
     elif st.session_state.transfers_interval == 'Monthly':
         transfers_over_time = transfers_daily
-        transfers_over_time = transfers_daily.groupby([pd.Grouper(freq='M', key='Date')]).agg(
+        transfers_over_time = transfers_daily.groupby([pd.Grouper(freq='MS', key='Date')]).agg(
             {'Transfers': 'sum', 'Users': 'sum', 'Volume': 'sum', 'AmountAverage': 'mean',
                 'AmountMedian': 'mean', 'Transfers/User': 'mean', 'Volume/User': 'mean'}).reset_index()
 
@@ -264,7 +264,7 @@ with tab_assets:
             'AmountAverage': 'mean', 'AmountMedian': 'mean', 'Transfers/User': 'mean', 'Volume/User': 'mean'}).reset_index()
     elif st.session_state.assets_interval == 'Monthly':
         df = transfers_assets_daily
-        df = df.groupby([pd.Grouper(freq='M', key='Date'), 'Asset']).agg({'Transfers': 'sum', 'Users': 'sum', 'Volume': 'sum',
+        df = df.groupby([pd.Grouper(freq='MS', key='Date'), 'Asset']).agg({'Transfers': 'sum', 'Users': 'sum', 'Volume': 'sum',
             'AmountAverage': 'mean', 'AmountMedian': 'mean', 'Transfers/User': 'mean', 'Volume/User': 'mean'}).reset_index()
         df['RowNumber'] = df.groupby('Date')['Volume'].rank(method='max', ascending=False)
         df.loc[df['RowNumber'] > 3, 'Asset'] = 'Other'

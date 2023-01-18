@@ -22,7 +22,7 @@ with open('style.css')as f:
     st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html = True)
 
 # Data Sources
-@st.cache(ttl=3600)
+@st.cache(ttl=1000, allow_output_mutation=True)
 def get_data(query):
     if query == 'Prices Overview':
         return pd.read_json('https://api.flipsidecrypto.com/api/v2/queries/6d1382f2-62fe-493e-8fec-73fb4923fe82/data/latest')
@@ -77,26 +77,21 @@ with tab_overview:
     interval = st.radio('**Time Interval**', ['Daily', 'Weekly', 'Monthly'], key='transactions_interval', horizontal=True)
 
     if st.session_state.transactions_interval == 'Daily':
-        price_over_time = prices_daily
         blocks_over_time = blocks_daily
         transactions_over_time = transactions_daily
     elif st.session_state.transactions_interval == 'Weekly':
-        price_over_time = prices_daily
-        price_over_time = price_over_time.groupby([pd.Grouper(freq='W', key='Date')]).agg('mean').reset_index()
         blocks_over_time = blocks_daily
         blocks_over_time = blocks_over_time.groupby([pd.Grouper(freq='W', key='Date')]).agg(
-            {'Blocks': 'sum', 'Transactions': 'sum', 'Validators': 'sum', 'BlockTime': 'mean'}).reset_index()
+            {'Blocks': 'sum', 'Transactions': 'sum', 'BlockTime': 'mean'}).reset_index()
         transactions_over_time = transactions_daily
         transactions_over_time = transactions_over_time.groupby([pd.Grouper(freq='W', key='Date')]).agg(
             {'Blocks': 'sum', 'Transactions': 'sum', 'Users': 'sum', 'TPS': 'mean'}).reset_index()
     elif st.session_state.transactions_interval == 'Monthly':
-        price_over_time = prices_daily
-        price_over_time = price_over_time.groupby([pd.Grouper(freq='M', key='Date')]).agg('mean').reset_index()
         blocks_over_time = blocks_daily
-        blocks_over_time = blocks_over_time.groupby([pd.Grouper(freq='M', key='Date')]).agg(
-            {'Blocks': 'sum', 'Transactions': 'sum', 'Validators': 'sum', 'BlockTime': 'mean'}).reset_index()
+        blocks_over_time = blocks_over_time.groupby([pd.Grouper(freq='MS', key='Date')]).agg(
+            {'Blocks': 'sum', 'Transactions': 'sum', 'BlockTime': 'mean'}).reset_index()
         transactions_over_time = transactions_daily
-        transactions_over_time = transactions_over_time.groupby([pd.Grouper(freq='M', key='Date')]).agg(
+        transactions_over_time = transactions_over_time.groupby([pd.Grouper(freq='MS', key='Date')]).agg(
             {'Blocks': 'sum', 'Transactions': 'sum', 'Users': 'sum', 'TPS': 'mean'}).reset_index()
 
     fig = sp.make_subplots(specs=[[{'secondary_y': True}]])
@@ -156,19 +151,32 @@ with tab_status:
         fig.update_traces(showlegend=False, textinfo='percent+label', textposition='inside')
         st.plotly_chart(fig, use_container_width=True, theme=theme_plotly)
 
-    st.subheader('Success Rate')
+    st.subheader('Success Rate Over Time')
 
-    fig = px.line(transactions_status_daily, x='Date', y='Transactions', color='Status', custom_data=['Status'], title='Transactions Over Time')
+    interval = st.radio('**Time Interval**', ['Daily', 'Weekly', 'Monthly'], key='success_interval', horizontal=True)
+
+    if st.session_state.success_interval == 'Daily':
+        df = transactions_status_daily
+    elif st.session_state.success_interval == 'Weekly':
+        df = transactions_status_daily
+        df = df.groupby([pd.Grouper(freq='W', key='Date'), 'Status']).agg(
+            {'Blocks': 'sum', 'Transactions': 'sum', 'Users': 'sum', 'Gas': 'sum', 'Fees': 'sum'}).reset_index()
+    elif st.session_state.success_interval == 'Monthly':
+        df = transactions_status_daily
+        df = df.groupby([pd.Grouper(freq='MS', key='Date'), 'Status']).agg(
+            {'Blocks': 'sum', 'Transactions': 'sum', 'Users': 'sum', 'Gas': 'sum', 'Fees': 'sum'}).reset_index()
+
+    fig = px.line(df, x='Date', y='Transactions', color='Status', custom_data=['Status'], title='Transactions Over Time')
     fig.update_layout(legend_title=None, xaxis_title=None, yaxis_title='Transactions', hovermode='x unified')
     fig.update_traces(hovertemplate='%{customdata}: %{y:,.0f}<extra></extra>')
     st.plotly_chart(fig, use_container_width=True, theme=theme_plotly)
 
-    fig = px.line(transactions_status_daily, x='Date', y='Users', color='Status', custom_data=['Status'], title='Users Over Time')
+    fig = px.line(df, x='Date', y='Users', color='Status', custom_data=['Status'], title='Users Over Time')
     fig.update_layout(legend_title=None, xaxis_title=None, yaxis_title='Transactions', hovermode='x unified')
     fig.update_traces(hovertemplate='%{customdata}: %{y:,.0f}<extra></extra>')
     st.plotly_chart(fig, use_container_width=True, theme=theme_plotly)
 
-    fig = px.line(transactions_status_daily, x='Date', y='Fees', color='Status', custom_data=['Status'], title='Fees Over Time')
+    fig = px.line(df, x='Date', y='Fees', color='Status', custom_data=['Status'], title='Fees Over Time')
     fig.update_layout(legend_title=None, xaxis_title=None, yaxis_title='Fees [USD]', hovermode='x unified')
     fig.update_traces(hovertemplate='%{customdata}: %{y:,.2f}<extra></extra>')
     st.plotly_chart(fig, use_container_width=True, theme=theme_plotly)
@@ -198,7 +206,7 @@ with tab_price:
         price_over_time = price_over_time.groupby([pd.Grouper(freq='W', key='Date')]).agg('mean').reset_index()
     elif st.session_state.prices_interval == 'Monthly':
         price_over_time = prices_daily
-        price_over_time = price_over_time.groupby([pd.Grouper(freq='M', key='Date')]).agg('mean').reset_index()
+        price_over_time = price_over_time.groupby([pd.Grouper(freq='MS', key='Date')]).agg('mean').reset_index()
 
     fig = sp.make_subplots(specs=[[{'secondary_y': True}]])
     fig.add_trace(go.Bar(x=price_over_time['Date'], y=price_over_time['Change'], name='Change'), secondary_y=False)
